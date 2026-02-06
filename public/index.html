@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Mood Recommender</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Floating Stars Background -->
+    <div class="stars-container" id="starsContainer"></div>
+
+    <!-- User Profile Section (Top Right) -->
+    <div class="user-profile-section">
+        <!-- When logged out -->
+        <div id="loggedOutSection" class="auth-buttons">
+            <button class="btn-auth btn-login">Login</button>
+            <button class="btn-auth btn-signup">Sign Up</button>
+        </div>
+        
+        <!-- When logged in -->
+        <div id="loggedInSection" class="user-info" style="display: none;">
+            <span class="user-greeting">👋 <span id="userName"></span></span>
+            <button class="btn-auth btn-history">📜 History</button>
+            <button class="btn-auth btn-logout">Logout</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ API Configuration</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Enter your Google Gemini API key to get started:</p>
+                <input 
+                    type="password" 
+                    id="apiKeyInput" 
+                    placeholder="Paste your API key here..."
+                    autocomplete="off"
+                >
+                <p class="hint">Get a free API key at: <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="saveApiKeyBtn">Save & Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="settings-modal" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔐 Login</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="loginEmail" class="form-label">Email</label>
+                    <input type="email" class="form-control auth-input" id="loginEmail" placeholder="your@email.com">
+                </div>
+                <div class="mb-3">
+                    <label for="loginPassword" class="form-label">Password</label>
+                    <input type="password" class="form-control auth-input" id="loginPassword" placeholder="Enter password">
+                </div>
+                <div id="loginError" class="error-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">Cancel</button>
+                <button class="btn btn-primary" id="loginSubmitBtn">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="settings-modal" id="registerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✨ Create Account</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="registerName" class="form-label">Name</label>
+                    <input type="text" class="form-control auth-input" id="registerName" placeholder="Your name">
+                </div>
+                <div class="mb-3">
+                    <label for="registerEmail" class="form-label">Email</label>
+                    <input type="email" class="form-control auth-input" id="registerEmail" placeholder="your@email.com">
+                </div>
+                <div class="mb-3">
+                    <label for="registerPassword" class="form-label">Password</label>
+                    <input type="password" class="form-control auth-input" id="registerPassword" placeholder="Create password">
+                </div>
+                <div id="registerError" class="error-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">Cancel</button>
+                <button class="btn btn-primary" id="registerSubmitBtn">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header with Settings -->
+        <header>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+                <div class="logo">🎵 Mood Vibes</div>
+                <button class="settings-btn" id="settingsBtn" title="API Settings">⚙️</button>
+            </div>
+            <p class="tagline">Discover songs that match your feelings</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="input-section">
+            <div class="input-group">
+                <label class="input-label">How are you feeling?</label>
+                <div class="input-row">
+                    <input 
+                        type="text" 
+                        id="moodInput" 
+                        placeholder="Tell us your mood or write a sentence..."
+                        autocomplete="off"
+                    >
+                    <button class="btn btn-primary" id="recommendBtn">Find Songs</button>
+                </div>
+                
+                <div class="mood-presets">
+                    <span class="mood-chip">Happy</span>
+                    <span class="mood-chip">Sad</span>
+                    <span class="mood-chip">Energetic</span>
+                    <span class="mood-chip">Chill</span>
+                    <span class="mood-chip">Angry</span>
+                    <span class="mood-chip">Romantic</span>
+                </div>
+
+                <div class="sentiment-display" id="sentimentDisplay">
+                    <div class="sentiment-bar">
+                        <div class="sentiment-fill" id="sentimentFill"></div>
+                    </div>
+                    <div class="sentiment-text">
+                        <strong>Mood:</strong> <span id="sentimentLabel">Analyzing...</span> 
+                        (<span id="sentimentScore">0</span>%)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <div class="results-header">
+                <h2 class="results-title" id="resultsTitle">Recommended Songs</h2>
+                <p class="results-subtitle" id="resultsSubtitle">Based on your mood</p>
+            </div>
+
+            <div class="songs-grid" id="songsGrid"></div>
+
+            <div style="text-align: center; margin-top: 40px;">
+                <button class="btn btn-primary" id="tryAnotherMoodBtn">
+                    ← Try Another Mood
+                </button>
+            </div>
+        </div>
+    </div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- API Client FIRST (not module) -->
+<script src="api-client.js"></script>
+
+<!-- Main Script (also not module now) -->
+<script src="script.js"></script>
+</body>
+</html>
