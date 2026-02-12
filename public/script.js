@@ -1,10 +1,6 @@
 // Remove this line: import api from './api-client.js';
 // api is now available globally from api-client.js
 
-// Google Generative Language API Configuration
-let GEMINI_API_KEY = "YOUR_API_KEY" //localStorage.getItem('GEMINI_API_KEY') || '';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-
 // Rate limiting
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 3000;
@@ -160,35 +156,6 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// ========== SETTINGS MODAL MANAGEMENT ==========
-
-function openSettingsModal() {
-    const modal = document.getElementById('settingsModal');
-    const input = document.getElementById('apiKeyInput');
-    modal.style.display = 'flex';
-    input.value = GEMINI_API_KEY;
-    input.focus();
-}
-
-function closeSettingsModal() {
-    document.getElementById('settingsModal').style.display = 'none';
-}
-
-function saveApiKey() {
-    const apiKey = document.getElementById('apiKeyInput').value.trim();
-    
-    if (!apiKey) {
-        alert('Please enter your API key');
-        return;
-    }
-    
-    localStorage.setItem('GEMINI_API_KEY', apiKey);
-    GEMINI_API_KEY = apiKey;
-    
-    closeSettingsModal();
-    showNotification('✅ API Key saved successfully!', 'success');
-}
-
 // ========== MOOD RECOMMENDATION ==========
 
 function updateThemeColors(mood) {
@@ -207,30 +174,20 @@ async function handleRecommend() {
         return;
     }
 
-    if (!GEMINI_API_KEY) {
-        alert('Please set your API key first! Click the ⚙️ settings button.');
-        openSettingsModal();
-        return;
-    }
-
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastRequestTime;
-    
-    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-        const waitTime = Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000);
-        alert(`⏱️ Please wait ${waitTime} seconds before making another request.`);
-        return;
-    }
-
     const btn = document.getElementById('recommendBtn');
     btn.disabled = true;
     btn.textContent = 'Analyzing mood...';
-    lastRequestTime = Date.now();
 
     try {
-        const result = await analyzeAndRecommendWithGemini(moodInput);
-        const sentimentAnalysis = result.sentiment;
-        const songs = result.songs;
+        // Call Rails backend instead of Gemini directly
+        const result = await api.analyzeMood(moodInput);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        const sentimentAnalysis = result.data.sentiment;
+        const songs = result.data.songs;
         
         if (sentimentAnalysis.emotion) {
             updateThemeColors(sentimentAnalysis.emotion);
@@ -257,20 +214,12 @@ async function handleRecommend() {
             if (saveResult.success) {
                 console.log('✅ Songs saved to history!');
                 showNotification(`💾 Saved ${saveResult.data.saved_count} songs to your history`, 'success');
-            } else {
-                console.log('Not saved - user may need to log in');
             }
         }
         
     } catch (error) {
         console.error('Error:', error);
-        const errorMsg = error.message;
-        
-        if (errorMsg.includes('Rate limit') || errorMsg.includes('429')) {
-            alert('⏱️ Rate limit exceeded! Please wait and try again.');
-        } else {
-            alert('Error: ' + errorMsg);
-        }
+        alert('Error: ' + error.message);
     } finally {
         btn.disabled = false;
         btn.textContent = 'Find Songs';
@@ -345,117 +294,6 @@ function handleTryAnotherMood() {
     document.getElementById('resultsSection').classList.remove('active');
 }
 
-// ========== GEMINI API ==========
-
-async function analyzeAndRecommendWithGemini(userInput) {
-    const prompt = `You are a mood analyzer and music recommender. Based on the user's input, provide sentiment analysis and song recommendations.
-
-User input: "${userInput}"
-
-Respond with JSON in this exact format (no markdown, no extra text):
-{
-  "sentiment": {
-    "sentiment": <0-100 score where 0 is very negative and 100 is very positive>,
-    "label": "<mood description with emoji>",
-    "emotion": "<ONE WORD emotion from this list: Happy, Sad, Energetic, Chill, Angry, or Romantic>",
-    "genre": "<music genre that matches this mood>"
-  },
-  "songs": [
-    {
-      "title": "Song Title",
-      "artist": "Artist Name",
-      "energy": "high/medium/low",
-      "danceability": "high/medium/low",
-      "valence": "positive/neutral/negative",
-      "duration": "3:45"
-    },
-    {
-      "title": "Song Title 2",
-      "artist": "Artist Name 2",
-      "energy": "high/medium/low",
-      "danceability": "high/medium/low",
-      "valence": "positive/neutral/negative",
-      "duration": "4:12"
-    },
-    {
-      "title": "Song Title 3",
-      "artist": "Artist Name 3",
-      "energy": "high/medium/low",
-      "danceability": "high/medium/low",
-      "valence": "positive/neutral/negative",
-      "duration": "3:30"
-    },
-    {
-      "title": "Song Title 4",
-      "artist": "Artist Name 4",
-      "energy": "high/medium/low",
-      "danceability": "high/medium/low",
-      "valence": "positive/neutral/negative",
-      "duration": "2:58"
-    },
-    {
-      "title": "Song Title 5",
-      "artist": "Artist Name 5",
-      "energy": "high/medium/low",
-      "danceability": "high/medium/low",
-      "valence": "positive/neutral/negative",
-      "duration": "3:22"
-    }
-  ]
-}`;
-
-    try {
-        const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.text();
-            const statusCode = response.status;
-            
-            if (statusCode === 401 || statusCode === 403) {
-                throw new Error('Invalid API key. Please check settings.');
-            } else if (statusCode === 429) {
-                throw new Error('Rate limit exceeded.');
-            } else {
-                throw new Error(`API Error (${statusCode})`);
-            }
-        }
-
-        const data = await response.json();
-        
-        if (!data.candidates || !data.candidates[0]) {
-            throw new Error('No response from Gemini API');
-        }
-
-        const responseText = data.candidates[0].content.parts[0].text;
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        
-        if (!jsonMatch) {
-            throw new Error('Could not parse response');
-        }
-        
-        const result = JSON.parse(jsonMatch[0]);
-        
-        return {
-            sentiment: {
-                sentiment: Math.min(100, Math.max(0, result.sentiment.sentiment)),
-                label: result.sentiment.label || 'Neutral',
-                emotion: result.sentiment.emotion || 'Happy',
-                genre: result.sentiment.genre || 'Pop'
-            },
-            songs: result.songs || []
-        };
-    } catch (error) {
-        console.error('Analysis error:', error);
-        throw new Error('Failed to analyze mood: ' + error.message);
-    }
-}
-
 // ========== FLOATING STARS ==========
 
 function createStars() {
@@ -499,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (modal) {
                 if (modal.id === 'loginModal') closeLoginModal();
                 else if (modal.id === 'registerModal') closeRegisterModal();
-                else if (modal.id === 'settingsModal') closeSettingsModal();
             }
         });
     });
@@ -524,21 +361,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (registerPassword) registerPassword.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleRegister();
-    });
-    
-    // Settings modal
-    const settingsBtn = document.getElementById('settingsBtn');
-    const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
-    const settingsModal = document.getElementById('settingsModal');
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    
-    if (settingsBtn) settingsBtn.addEventListener('click', openSettingsModal);
-    if (saveApiKeyBtn) saveApiKeyBtn.addEventListener('click', saveApiKey);
-    if (settingsModal) settingsModal.addEventListener('click', (e) => {
-        if (e.target.id === 'settingsModal') closeSettingsModal();
-    });
-    if (apiKeyInput) apiKeyInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') saveApiKey();
     });
     
     // Mood recommendation
@@ -573,10 +395,4 @@ window.addEventListener('load', () => {
     if (moodInput) moodInput.focus();
     createStars();
     updateAuthUI();
-    
-    if (!GEMINI_API_KEY) {
-        setTimeout(() => {
-            openSettingsModal();
-        }, 500);
-    }
 });

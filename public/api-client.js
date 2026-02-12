@@ -4,6 +4,7 @@
 const API_BASE_URL = 'http://localhost:3000/api'; // Rails API base URL
 
 class MoodVibesAPI {
+  
   constructor() {
     this.token = localStorage.getItem('auth_token');
   }
@@ -92,6 +93,28 @@ class MoodVibesAPI {
   getCurrentUser() {
     const userStr = localStorage.getItem('user');
     return userStr ? JSON.parse(userStr) : null;
+  }
+
+  // --- NEW: Mood Analysis Method ---
+  async analyzeMood(moodInput) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/songs/analyze`, {
+        method: 'POST',
+        headers: this.getHeaders(false), // No auth required
+        body: JSON.stringify({ mood_input: moodInput })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to analyze mood');
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Mood analysis error:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // --- Song methods ---

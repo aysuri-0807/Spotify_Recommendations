@@ -1,4 +1,28 @@
 class Api::SongsController < ApplicationController
+  # Only require authentication for saving and viewing suggestions
+  # Anyone can analyze mood without logging in
+  before_action :authenticate_user!, only: [:create_suggestions, :recent]
+  
+  # Mood analysis using Gemini AI
+  def analyze_mood
+    user_input = params[:mood_input]
+    
+    if user_input.blank?
+      return render json: { error: 'Mood input is required' }, status: :unprocessable_entity
+    end
+    
+    begin
+      analyzer = GeminiSentimentAnalyzer.new
+      result = analyzer.analyze_and_recommend(user_input)
+      
+      render json: result, status: :ok
+    rescue StandardError => e
+      Rails.logger.error "Gemini API error: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      render json: { error: e.message }, status: :service_unavailable
+    end
+  end
+  
   def create_suggestions
     mood = params[:mood]
     mood_description = params[:mood_description]

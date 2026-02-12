@@ -6,7 +6,7 @@ gem "rails", "~> 8.1.2"
 gem "pg", "~> 1.1"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
-
+gem 'dotenv-rails', groups: [:development, :test]
 # Authentication
 gem 'bcrypt', '~> 3.1.7'
 gem 'jwt', '~> 2.7'
