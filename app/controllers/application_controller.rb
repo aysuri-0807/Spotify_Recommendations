@@ -22,4 +22,8 @@ class ApplicationController < ActionController::API
   def authenticate_user!
     render json: { error: 'Not authenticated' }, status: :unauthorized unless current_user
   end
+  
+  def generate_token(user)
+    JsonWebToken.encode(user_id: user.id)
+  end
 end
