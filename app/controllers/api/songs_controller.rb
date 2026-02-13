@@ -1,9 +1,10 @@
+# app/controllers/api/songs_controller.rb
 class Api::SongsController < ApplicationController
   # Only require authentication for saving and viewing suggestions
   # Anyone can analyze mood without logging in
-  before_action :authenticate_user!, only: [:create_suggestions, :recent]
+  before_action :authenticate_user!, only: [:create_suggestions, :recent, :cache_stats]
   
-  # Mood analysis using Gemini AI
+  # Mood analysis using Gemini AI with smart caching
   def analyze_mood
     user_input = params[:mood_input]
     
@@ -12,12 +13,20 @@ class Api::SongsController < ApplicationController
     end
     
     begin
-      analyzer = GeminiSentimentAnalyzer.new
+      # Pass current user ID to analyzer (nil if not logged in)
+      # This ensures logged-in users don't get their own cached results
+      analyzer = GeminiSentimentAnalyzer.new(user_id: current_user&.id)
       result = analyzer.analyze_and_recommend(user_input)
       
-      render json: result, status: :ok
+      # Add cache hit info to response
+      render json: result.merge(
+        cache_info: {
+          cache_hit: result[:cache_hit],
+          message: result[:cache_hit] ? '✅ Loaded from cache' : '🆕 Fresh from Gemini + Spotify'
+        }
+      ), status: :ok
     rescue StandardError => e
-      Rails.logger.error "Gemini API error: #{e.message}"
+      Rails.logger.error "Mood analysis error: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
       render json: { error: e.message }, status: :service_unavailable
     end
@@ -86,5 +95,34 @@ class Api::SongsController < ApplicationController
         }
       end
     }
+  end
+  
+  # Optional: View cache statistics (admin/debugging)
+  def cache_stats
+    stats = {
+      total_cached_moods: MoodCache.count,
+      total_cache_hits: MoodCache.sum(:access_count),
+      most_popular_moods: MoodCache.order(access_count: :desc).limit(10).map do |cache|
+        {
+          mood: cache.mood_key,
+          hits: cache.access_count,
+          last_accessed: cache.last_accessed_at
+        }
+      end,
+      cache_efficiency: calculate_cache_efficiency
+    }
+    
+    render json: stats
+  end
+  
+  private
+  
+  def calculate_cache_efficiency
+    total_requests = MoodCache.sum(:access_count) + MoodCache.count
+    cache_hits = MoodCache.sum(:access_count)
+    
+    return 0 if total_requests.zero?
+    
+    ((cache_hits.to_f / total_requests) * 100).round(2)
   end
 end

@@ -5,13 +5,30 @@ require 'json'
 class GeminiSentimentAnalyzer
   GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
   
-  def initialize
+  def initialize(user_id: nil)
     @api_key = ENV['GEMINI_API_KEY']
+    @user_id = user_id
     raise 'Gemini API key not configured' if @api_key.blank?
   end
   
   def analyze_and_recommend(user_input)
-    # Get sentiment analysis from Gemini
+    # Check cache first (exclude current user's own cache)
+    cached_result = MoodCache.find_similar(user_input, exclude_user_id: @user_id)
+    
+    if cached_result
+      Rails.logger.info "✅ Cache HIT for input: '#{user_input}' (Cache ID: #{cached_result.id})"
+      cached_result.mark_accessed!
+      
+      return {
+        sentiment: cached_result.sentiment_data.deep_symbolize_keys,
+        songs: cached_result.random_songs(5), # Return 5 random songs from cache
+        cache_hit: true
+      }
+    end
+    
+    Rails.logger.info "❌ Cache MISS for input: '#{user_input}' - Calling Gemini API"
+    
+    # Get fresh sentiment analysis from Gemini
     sentiment_data = analyze_sentiment(user_input)
     
     # Search Spotify for real songs based on mood
@@ -19,15 +36,29 @@ class GeminiSentimentAnalyzer
     spotify_tracks = spotify_service.search_songs(
       sentiment_data[:emotion],
       sentiment_data[:genre],
-      limit: 10
+      limit: 15  # Get more songs for cache diversity
     )
     
     # Enhance Spotify tracks with audio features
     songs = enhance_tracks_with_features(spotify_tracks, spotify_service)
     
+    # Cache the result for future use
+    begin
+      MoodCache.cache_result(
+        user_input,
+        sentiment_data,
+        songs,
+        user_id: @user_id
+      )
+      Rails.logger.info "💾 Cached result for: '#{user_input}'"
+    rescue => e
+      Rails.logger.error "Failed to cache result: #{e.message}"
+    end
+    
     {
       sentiment: sentiment_data,
-      songs: songs
+      songs: songs.take(5), # Return first 5 songs
+      cache_hit: false
     }
   end
   
@@ -107,7 +138,7 @@ class GeminiSentimentAnalyzer
   end
   
   def enhance_tracks_with_features(spotify_tracks, spotify_service)
-    spotify_tracks.take(5).map do |track|
+    spotify_tracks.map do |track|
       # Get audio features from Spotify
       features = spotify_service.get_audio_features(track[:spotify_id])
       

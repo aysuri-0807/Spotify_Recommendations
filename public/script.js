@@ -26,7 +26,7 @@ function updateAuthUI() {
     if (user && api.isAuthenticated()) {
         loggedOut.style.display = 'none';
         loggedIn.style.display = 'flex';
-        userName.textContent = user.name;
+        userName.textContent = `Hey ${user.name}!`;
     } else {
         loggedOut.style.display = 'flex';
         loggedIn.style.display = 'none';
@@ -145,30 +145,37 @@ async function handleLogout() {
     showNotification('👋 Logged out successfully', 'info');
 }
 
-// Simple notification function
+// Notification function
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
+    
+    let bgColor = '#4A90E2';
+    if (type === 'success') bgColor = '#1DB954';
+    if (type === 'error') bgColor = '#E74C3C';
+    
     notification.style.cssText = `
         position: fixed;
-        top: 20px;
+        bottom: 20px;
         right: 20px;
-        background: ${type === 'success' ? '#1DB954' : type === 'error' ? '#E74C3C' : '#4A90E2'};
+        background: ${bgColor};
         color: white;
         padding: 15px 25px;
         border-radius: 10px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         z-index: 10000;
-        animation: slideInRight 0.3s ease;
+        font-weight: 600;
+        font-size: 14px;
+        animation: slideInUp 0.3s ease forwards;
     `;
     
     document.body.appendChild(notification);
     
     setTimeout(() => {
-        notification.style.animation = 'slideOutRight 0.3s ease';
+        notification.style.animation = 'slideOutDown 0.3s ease forwards';
         setTimeout(() => notification.remove(), 300);
-    }, 3000);
+    }, 1500);
 }
 
 // ========== MOOD RECOMMENDATION ==========
@@ -203,8 +210,6 @@ async function handleRecommend() {
         const sentimentAnalysis = result.data.sentiment;
         const songs = result.data.songs;
         
-        console.log('Sentiment Analysis:', sentimentAnalysis); // Debug log
-        
         if (sentimentAnalysis.emotion) {
             updateThemeColors(sentimentAnalysis.emotion);
         }
@@ -212,25 +217,13 @@ async function handleRecommend() {
         setTimeout(() => {
             const sentimentDisplay = document.getElementById('sentimentDisplay');
             sentimentDisplay.classList.add('active');
-            
-            const sentimentFill = document.getElementById('sentimentFill');
-            const sentimentLabel = document.getElementById('sentimentLabel');
-            const sentimentScore = document.getElementById('sentimentScore');
-            
-            // Update the bar
-            sentimentFill.style.width = sentimentAnalysis.sentiment + '%';
-            
-            // Update the label - make sure it shows properly
-            sentimentLabel.textContent = sentimentAnalysis.label || 'Neutral';
-            sentimentLabel.style.fontSize = '16px'; // Make it visible
-            
-            // Update the score
-            sentimentScore.textContent = sentimentAnalysis.sentiment;
+            document.getElementById('sentimentFill').style.width = sentimentAnalysis.sentiment + '%';
+            document.getElementById('sentimentLabel').textContent = sentimentAnalysis.label;
+            document.getElementById('sentimentScore').textContent = sentimentAnalysis.sentiment;
             
             displayRecommendations(sentimentAnalysis, songs, moodInput);
         }, 600);
 
-        // Save to backend if user is logged in
         if (api.isAuthenticated()) {
             const saveResult = await api.saveSongSuggestions(
                 sentimentAnalysis.emotion || moodInput,
@@ -295,7 +288,6 @@ function displayRecommendations(analysis, songs, originalMood) {
                     <div class="match-badge">${matchScore}% Match</div>
                 </div>
                 
-                <!-- Spotify Embed Player (hidden by default) -->
                 <div class="spotify-player-container" style="display: none; margin-top: 15px;">
                     <iframe 
                         style="border-radius:12px" 
@@ -311,17 +303,14 @@ function displayRecommendations(analysis, songs, originalMood) {
             </div>
         `;
         
-        // Click handler - toggle Spotify player
         songCard.addEventListener('click', () => {
             const playerContainer = songCard.querySelector('.spotify-player-container');
             const isVisible = playerContainer.style.display !== 'none';
             
-            // Hide all other players first
             document.querySelectorAll('.spotify-player-container').forEach(p => {
                 p.style.display = 'none';
             });
             
-            // Toggle this player
             if (!isVisible) {
                 playerContainer.style.display = 'block';
                 songCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -342,6 +331,12 @@ function handleTryAnotherMood() {
     document.getElementById('moodInput').focus();
     document.getElementById('moodInput').value = '';
     document.getElementById('resultsSection').classList.remove('active');
+    
+    // Also hide sentiment bar
+    const sentimentDisplay = document.getElementById('sentimentDisplay');
+    if (sentimentDisplay) {
+        sentimentDisplay.classList.remove('active');
+    }
 }
 
 // ========== FLOATING STARS ==========
@@ -418,19 +413,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const moodInput = document.getElementById('moodInput');
     
     if (recommendBtn) recommendBtn.addEventListener('click', handleRecommend);
-    if (moodInput) moodInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleRecommend();
-    });
+    
+    // Mood input event listeners
+    if (moodInput) {
+        // Hide sentiment bar when typing
+        moodInput.addEventListener('input', () => {
+            const sentimentDisplay = document.getElementById('sentimentDisplay');
+            if (sentimentDisplay) {
+                sentimentDisplay.classList.remove('active');
+            }
+        });
+        
+        // Enter key to submit
+        moodInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleRecommend();
+        });
+    }
     
     // Mood chips
     document.querySelectorAll('.mood-chip').forEach(chip => {
         chip.addEventListener('click', () => {
             const mood = chip.textContent.trim();
             const moodInputEl = document.getElementById('moodInput');
+            
             if (moodInputEl) moodInputEl.value = mood;
             updateThemeColors(mood);
+            
             document.querySelectorAll('.mood-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
+            
+            // Hide sentiment bar when selecting preset
+            const sentimentDisplay = document.getElementById('sentimentDisplay');
+            if (sentimentDisplay) {
+                sentimentDisplay.classList.remove('active');
+            }
         });
     });
     

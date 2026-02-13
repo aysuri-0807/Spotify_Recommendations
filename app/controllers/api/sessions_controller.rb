@@ -1,10 +1,20 @@
+# app/controllers/api/sessions_controller.rb
 class Api::SessionsController < ApplicationController
   skip_before_action :authenticate_request, only: [:create]
   
   def create
     user = User.find_by(email: params[:email])
     
-    if user&.authenticate(params[:password])
+    # Check if user exists first
+    if user.nil?
+      render json: { 
+        error: 'This email is not registered. Please sign up first!' 
+      }, status: :unauthorized
+      return
+    end
+    
+    # Then check password
+    if user.authenticate(params[:password])
       token = generate_token(user)
       render json: {
         message: 'Login successful',
@@ -12,7 +22,7 @@ class Api::SessionsController < ApplicationController
         token: token
       }
     else
-      render json: { error: 'Invalid email or password' }, status: :unauthorized
+      render json: { error: 'Incorrect password. Please try again.' }, status: :unauthorized
     end
   end
   
