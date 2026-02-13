@@ -36,20 +36,26 @@ function updateAuthUI() {
 function showLoginModal() {
     document.getElementById('loginModal').style.display = 'flex';
     document.getElementById('loginEmail').focus();
-    document.getElementById('loginError').textContent = '';
+    const errorDiv = document.getElementById('loginError');
+    errorDiv.textContent = '';
+    errorDiv.classList.remove('show');
 }
 
 function closeLoginModal() {
     document.getElementById('loginModal').style.display = 'none';
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPassword').value = '';
-    document.getElementById('loginError').textContent = '';
+    const errorDiv = document.getElementById('loginError');
+    errorDiv.textContent = '';
+    errorDiv.classList.remove('show');
 }
 
 function showRegisterModal() {
     document.getElementById('registerModal').style.display = 'flex';
     document.getElementById('registerName').focus();
-    document.getElementById('registerError').textContent = '';
+    const errorDiv = document.getElementById('registerError');
+    errorDiv.textContent = '';
+    errorDiv.classList.remove('show');
 }
 
 function closeRegisterModal() {
@@ -57,7 +63,9 @@ function closeRegisterModal() {
     document.getElementById('registerName').value = '';
     document.getElementById('registerEmail').value = '';
     document.getElementById('registerPassword').value = '';
-    document.getElementById('registerError').textContent = '';
+    const errorDiv = document.getElementById('registerError');
+    errorDiv.textContent = '';
+    errorDiv.classList.remove('show');
 }
 
 async function handleLogin() {
@@ -68,12 +76,14 @@ async function handleLogin() {
     
     if (!email || !password) {
         errorDiv.textContent = 'Please fill in all fields';
+        errorDiv.classList.add('show');
         return;
     }
     
     btn.disabled = true;
     btn.textContent = 'Logging in...';
     errorDiv.textContent = '';
+    errorDiv.classList.remove('show');
     
     const result = await api.login(email, password);
     
@@ -83,6 +93,7 @@ async function handleLogin() {
         showNotification('✅ Welcome back!', 'success');
     } else {
         errorDiv.textContent = result.data?.error || 'Login failed. Please try again.';
+        errorDiv.classList.add('show');
     }
     
     btn.disabled = false;
@@ -98,17 +109,20 @@ async function handleRegister() {
     
     if (!name || !email || !password) {
         errorDiv.textContent = 'Please fill in all fields';
+        errorDiv.classList.add('show');
         return;
     }
     
     if (password.length < 6) {
         errorDiv.textContent = 'Password must be at least 6 characters';
+        errorDiv.classList.add('show');
         return;
     }
     
     btn.disabled = true;
     btn.textContent = 'Creating account...';
     errorDiv.textContent = '';
+    errorDiv.classList.remove('show');
     
     const result = await api.register(email, password, name);
     
@@ -118,6 +132,7 @@ async function handleRegister() {
         showNotification('✅ Account created successfully!', 'success');
     } else {
         errorDiv.textContent = result.data?.errors?.join(', ') || 'Registration failed. Please try again.';
+        errorDiv.classList.add('show');
     }
     
     btn.disabled = false;
@@ -179,7 +194,6 @@ async function handleRecommend() {
     btn.textContent = 'Analyzing mood...';
 
     try {
-        // Call Rails backend instead of Gemini directly
         const result = await api.analyzeMood(moodInput);
         
         if (!result.success) {
@@ -189,6 +203,8 @@ async function handleRecommend() {
         const sentimentAnalysis = result.data.sentiment;
         const songs = result.data.songs;
         
+        console.log('Sentiment Analysis:', sentimentAnalysis); // Debug log
+        
         if (sentimentAnalysis.emotion) {
             updateThemeColors(sentimentAnalysis.emotion);
         }
@@ -196,9 +212,20 @@ async function handleRecommend() {
         setTimeout(() => {
             const sentimentDisplay = document.getElementById('sentimentDisplay');
             sentimentDisplay.classList.add('active');
-            document.getElementById('sentimentFill').style.width = sentimentAnalysis.sentiment + '%';
-            document.getElementById('sentimentLabel').textContent = sentimentAnalysis.label;
-            document.getElementById('sentimentScore').textContent = sentimentAnalysis.sentiment;
+            
+            const sentimentFill = document.getElementById('sentimentFill');
+            const sentimentLabel = document.getElementById('sentimentLabel');
+            const sentimentScore = document.getElementById('sentimentScore');
+            
+            // Update the bar
+            sentimentFill.style.width = sentimentAnalysis.sentiment + '%';
+            
+            // Update the label - make sure it shows properly
+            sentimentLabel.textContent = sentimentAnalysis.label || 'Neutral';
+            sentimentLabel.style.fontSize = '16px'; // Make it visible
+            
+            // Update the score
+            sentimentScore.textContent = sentimentAnalysis.sentiment;
             
             displayRecommendations(sentimentAnalysis, songs, moodInput);
         }, 600);
@@ -267,14 +294,37 @@ function displayRecommendations(analysis, songs, originalMood) {
                     </div>
                     <div class="match-badge">${matchScore}% Match</div>
                 </div>
+                
+                <!-- Spotify Embed Player (hidden by default) -->
+                <div class="spotify-player-container" style="display: none; margin-top: 15px;">
+                    <iframe 
+                        style="border-radius:12px" 
+                        src="https://open.spotify.com/embed/track/${song.spotify_id}?utm_source=generator" 
+                        width="100%" 
+                        height="152" 
+                        frameBorder="0" 
+                        allowfullscreen="" 
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                        loading="lazy">
+                    </iframe>
+                </div>
             </div>
         `;
         
+        // Click handler - toggle Spotify player
         songCard.addEventListener('click', () => {
-            if (song.external_url) {
-                window.open(song.external_url, '_blank');
-            } else {
-                alert(`🎵 Now Playing: "${song.title}" by ${song.artist}`);
+            const playerContainer = songCard.querySelector('.spotify-player-container');
+            const isVisible = playerContainer.style.display !== 'none';
+            
+            // Hide all other players first
+            document.querySelectorAll('.spotify-player-container').forEach(p => {
+                p.style.display = 'none';
+            });
+            
+            // Toggle this player
+            if (!isVisible) {
+                playerContainer.style.display = 'block';
+                songCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         });
 

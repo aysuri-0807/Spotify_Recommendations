@@ -11,69 +11,46 @@ class GeminiSentimentAnalyzer
   end
   
   def analyze_and_recommend(user_input)
-    prompt = build_prompt(user_input)
-    response = call_gemini_api(prompt)
-    parse_response(response)
+    # Get sentiment analysis from Gemini
+    sentiment_data = analyze_sentiment(user_input)
+    
+    # Search Spotify for real songs based on mood
+    spotify_service = SpotifySearchService.new
+    spotify_tracks = spotify_service.search_songs(
+      sentiment_data[:emotion],
+      sentiment_data[:genre],
+      limit: 10
+    )
+    
+    # Enhance Spotify tracks with audio features
+    songs = enhance_tracks_with_features(spotify_tracks, spotify_service)
+    
+    {
+      sentiment: sentiment_data,
+      songs: songs
+    }
   end
   
   private
   
-  def build_prompt(user_input)
+  def analyze_sentiment(user_input)
+    prompt = build_sentiment_prompt(user_input)
+    response = call_gemini_api(prompt)
+    parse_sentiment_response(response)
+  end
+  
+  def build_sentiment_prompt(user_input)
     <<~PROMPT
-      You are a mood analyzer and music recommender. Based on the user's input, provide sentiment analysis and song recommendations.
+      You are a mood analyzer for a music recommendation app. Analyze the user's mood.
 
       User input: "#{user_input}"
 
       Respond with JSON in this exact format (no markdown, no extra text):
       {
-        "sentiment": {
-          "sentiment": <0-100 score where 0 is very negative and 100 is very positive>,
-          "label": "<mood description with emoji>",
-          "emotion": "<ONE WORD emotion from this list: Happy, Sad, Energetic, Chill, Angry, or Romantic>",
-          "genre": "<music genre that matches this mood>"
-        },
-        "songs": [
-          {
-            "title": "Song Title",
-            "artist": "Artist Name",
-            "energy": "high/medium/low",
-            "danceability": "high/medium/low",
-            "valence": "positive/neutral/negative",
-            "duration": "3:45"
-          },
-          {
-            "title": "Song Title 2",
-            "artist": "Artist Name 2",
-            "energy": "high/medium/low",
-            "danceability": "high/medium/low",
-            "valence": "positive/neutral/negative",
-            "duration": "4:12"
-          },
-          {
-            "title": "Song Title 3",
-            "artist": "Artist Name 3",
-            "energy": "high/medium/low",
-            "danceability": "high/medium/low",
-            "valence": "positive/neutral/negative",
-            "duration": "3:30"
-          },
-          {
-            "title": "Song Title 4",
-            "artist": "Artist Name 4",
-            "energy": "high/medium/low",
-            "danceability": "high/medium/low",
-            "valence": "positive/neutral/negative",
-            "duration": "2:58"
-          },
-          {
-            "title": "Song Title 5",
-            "artist": "Artist Name 5",
-            "energy": "high/medium/low",
-            "danceability": "high/medium/low",
-            "valence": "positive/neutral/negative",
-            "duration": "3:22"
-          }
-        ]
+        "sentiment": <0-100 score where 0 is very negative and 100 is very positive>,
+        "label": "<mood description with emoji>",
+        "emotion": "<ONE WORD emotion from this list: Happy, Sad, Energetic, Chill, Angry, or Romantic>",
+        "genre": "<music genre that matches this mood>"
       }
     PROMPT
   end
@@ -110,7 +87,7 @@ class GeminiSentimentAnalyzer
     raise StandardError, 'Invalid response from Gemini API'
   end
   
-  def parse_response(data)
+  def parse_sentiment_response(data)
     candidates = data['candidates']
     raise StandardError, 'No response from Gemini API' unless candidates&.first
     
@@ -122,14 +99,61 @@ class GeminiSentimentAnalyzer
     result = JSON.parse(json_match[0])
     
     {
-      sentiment: {
-        sentiment: [[result.dig('sentiment', 'sentiment').to_i, 0].max, 100].min,
-        label: result.dig('sentiment', 'label') || 'Neutral',
-        emotion: result.dig('sentiment', 'emotion') || 'Happy',
-        genre: result.dig('sentiment', 'genre') || 'Pop'
-      },
-      songs: result['songs'] || []
+      sentiment: [[result['sentiment'].to_i, 0].max, 100].min,
+      label: result['label'] || 'Neutral 😐',
+      emotion: result['emotion'] || 'Happy',
+      genre: result['genre'] || 'Pop'
     }
+  end
+  
+  def enhance_tracks_with_features(spotify_tracks, spotify_service)
+    spotify_tracks.take(5).map do |track|
+      # Get audio features from Spotify
+      features = spotify_service.get_audio_features(track[:spotify_id])
+      
+      {
+        spotify_id: track[:spotify_id],
+        title: track[:title],
+        artist: track[:artist],
+        duration: format_duration(track[:duration_ms]),
+        duration_ms: track[:duration_ms],
+        spotify_uri: track[:spotify_uri],
+        external_url: track[:spotify_url],
+        image_url: track[:image_url],
+        preview_url: track[:preview_url],
+        album: track[:album],
+        # Convert Spotify audio features to your format
+        energy: audio_feature_label(features&.dig('energy')),
+        danceability: audio_feature_label(features&.dig('danceability')),
+        valence: valence_label(features&.dig('valence'))
+      }
+    end
+  end
+  
+  def format_duration(ms)
+    return "0:00" unless ms
+    total_seconds = ms / 1000
+    minutes = total_seconds / 60
+    seconds = total_seconds % 60
+    "#{minutes}:#{seconds.to_s.rjust(2, '0')}"
+  end
+  
+  def audio_feature_label(value)
+    return 'medium' unless value
+    case value
+    when 0...0.33 then 'low'
+    when 0.33...0.67 then 'medium'
+    else 'high'
+    end
+  end
+  
+  def valence_label(value)
+    return 'neutral' unless value
+    case value
+    when 0...0.33 then 'negative'
+    when 0.33...0.67 then 'neutral'
+    else 'positive'
+    end
   end
   
   def handle_api_error(response)

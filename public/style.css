@@ -130,7 +130,13 @@ body {
     background: rgba(231, 76, 60, 0.1);
     border-radius: 8px;
     border: 1px solid rgba(231, 76, 60, 0.3);
+    display: none; /* Add this line */
 }
+
+.error-message.show {
+    display: block; /* Add this line */
+}
+
 
 /* Floating Stars Background */
 .stars-container {
@@ -592,54 +598,18 @@ header {
     color: var(--text-secondary);
     font-size: 16px;
 }
-
-.songs-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 25px;
-    margin-bottom: 40px;
-    animation: fadeInUp 0.6s ease-out;
+.match-badge {
+    background: linear-gradient(135deg, var(--primary), #1ed760);
+    color: var(--dark-bg);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
 }
 
-.song-card {
-    background: linear-gradient(135deg, var(--card-bg), #1f1f3a);
-    border: 2px solid var(--primary);
-    border-radius: 16px;
-    overflow: hidden;
-    transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
-    cursor: pointer;
-    animation: scaleIn 0.5s ease-out both;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    position: relative;
-}
+/* ========== SPOTIFY PLAYER STYLES ========== */
 
-.song-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, var(--primary-glow), transparent);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: 1;
-}
-
-.song-card:hover::before {
-    opacity: 1;
-}
-
-.song-card:nth-child(1) { animation-delay: 0.1s; }
-.song-card:nth-child(2) { animation-delay: 0.2s; }
-.song-card:nth-child(3) { animation-delay: 0.3s; }
-
-.song-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 16px 40px rgba(29, 185, 84, 0.2);
-    border-color: var(--primary);
-}
-
+/* Album art with background image */
 .album-art {
     width: 100%;
     height: 200px;
@@ -650,6 +620,8 @@ header {
     font-size: 80px;
     position: relative;
     overflow: hidden;
+    background-size: cover;
+    background-position: center;
 }
 
 .album-art::after {
@@ -663,6 +635,38 @@ header {
     animation: shimmer 2s infinite;
 }
 
+/* Album overlay with play icon */
+.album-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
+    z-index: 2;
+}
+
+.song-card:hover .album-overlay {
+    background: rgba(0,0,0,0.6);
+}
+
+.play-icon {
+    font-size: 60px;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+}
+
+.song-card:hover .play-icon {
+    opacity: 1;
+    transform: scale(1.15);
+}
+
+/* Song info section */
 .song-info {
     padding: 20px;
 }
@@ -707,14 +711,122 @@ header {
     color: var(--primary);
 }
 
-.match-badge {
-    background: linear-gradient(135deg, var(--primary), #1ed760);
-    color: var(--dark-bg);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
+/* Song action buttons */
+.song-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
 }
+
+.btn-toggle-player {
+    flex: 1;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-secondary));
+    color: var(--dark-bg);
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-toggle-player:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.btn-toggle-player.playing {
+    background: var(--card-bg);
+    color: var(--primary);
+    border: 2px solid var(--primary);
+}
+
+.btn-open-spotify {
+    padding: 10px 16px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    gap: 6px;
+}
+
+.btn-open-spotify:hover {
+    border-color: #1DB954;
+    color: #1DB954;
+    transform: translateY(-2px);
+}
+
+/* Spotify embed player container */
+.spotify-player-container {
+    animation: slideDown 0.3s ease-out;
+    overflow: hidden;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        max-height: 200px;
+        transform: translateY(0);
+    }
+}
+
+.song-card {
+    cursor: pointer;
+    position: relative;
+}
+
+.song-card::after {
+    content: '🎵 Click to play';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: var(--primary);
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.song-card:hover::after {
+    opacity: 1;
+}
+.spotify-player-container.hidden {
+    display: none;
+}
+
+.spotify-player {
+    width: 100%;
+    height: 152px;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
+}
+
+/* ========== ANIMATIONS ========== */
 
 @keyframes slideDown {
     from {
@@ -809,7 +921,8 @@ header {
     }
 }
 
-/* Responsive */
+/* ========== RESPONSIVE ========== */
+
 @media (max-width: 768px) {
     .user-profile-section {
         top: 10px;
@@ -824,6 +937,20 @@ header {
     .user-greeting {
         display: none;
     }
+    
+    .album-art {
+        height: 180px;
+    }
+    
+    .play-icon {
+        font-size: 50px;
+    }
+    
+    .btn-toggle-player,
+    .btn-open-spotify {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -835,4 +962,47 @@ header {
         padding: 6px 10px;
         font-size: 11px;
     }
+    
+    .song-actions {
+        flex-direction: column;
+    }
+    
+    .btn-open-spotify {
+        width: 100%;
+    }
+}
+
+/* Fix play button styling */
+.play-button {
+    background: rgba(29, 185, 84, 0.9) !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 60px !important;
+    height: 60px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.play-button:hover {
+    background: rgba(29, 185, 84, 1) !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 20px rgba(29, 185, 84, 0.4) !important;
+}
+
+.play-button svg,
+.play-button i,
+.play-button::before {
+    color: white !important;
+    fill: white !important;
+}
+
+/* If you're using a different class name, also add this */
+.album-art button {
+    background: rgba(29, 185, 84, 0.9) !important;
+    border: none !important;
+    padding: 0 !important;
 }
