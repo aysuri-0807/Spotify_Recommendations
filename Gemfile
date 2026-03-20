@@ -10,7 +10,7 @@ gem "pg", "~> 1.1"
 gem "puma", ">= 5.0"
 gem 'dotenv-rails', groups: [:development, :test]
 # Authentication
-gem 'bcrypt', '~> 3.1.7'
+gem 'bcrypt', '~> 3.1.22'
 gem 'jwt', '~> 2.7'
 
 # CORS
